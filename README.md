@@ -1,7 +1,11 @@
 # halftone-node
-An InvokeAI node for converting a color or grayscale image to a halftoned representation. Output is an RGBA image.
+InvokeAI nodes for converting images to their halftoned representation. Output is an RGBA image.
 
-Example input/output:
+Halftone converts the source image to grayscale and then performs halftoning.
+
+CMYK Halftone converts the image to CMYK and applies a per-channel halftoning.
+
+Example input/output from Halftone:
 
 ![image](toothy.png)
 
