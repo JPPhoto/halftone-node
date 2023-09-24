@@ -2,7 +2,7 @@
 # Halftoning implementation via Bohumir Zamecnik (https://github.com/bzamecnik/halftone/)
 
 import random
-from typing import Optional, Callable, Tuple
+from typing import Callable, Optional, Tuple
 
 import numpy as np
 from PIL import Image
