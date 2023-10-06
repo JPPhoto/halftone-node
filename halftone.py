@@ -1,7 +1,6 @@
 # Copyright (c) 2023 Jonathan S. Pollack (https://github.com/JPPhoto)
 # Halftoning implementation via Bohumir Zamecnik (https://github.com/bzamecnik/halftone/)
 
-import random
 from typing import Callable, Optional, Tuple
 
 import numpy as np
@@ -42,14 +41,18 @@ class HalftoneBase:
         sin, cos = np.sin(angle_rad), np.cos(angle_rad)
         return x * cos - y * sin, x * sin + y * cos
 
-    def euclid_dot(self, spacing: float, angle: float) -> Callable[[int, int], float]:
+    def euclid_dot(self, spacing: float, angle: float, offset: bool = False) -> Callable[[int, int], float]:
         pixel_div = 2.0 / spacing
 
         def func(x: int, y: int):
             x, y = self.rotate(x * pixel_div, y * pixel_div, angle)
             return 0.5 - (0.25 * (np.sin(np.pi * (x + 0.5)) + np.cos(np.pi * y)))
 
-        return func
+        def func_offset(x: int, y: int):
+            x, y = self.rotate(x * pixel_div, y * pixel_div, angle)
+            return 0.5 - (0.25 * (np.sin(np.pi * (x + 1.5)) + np.cos(np.pi * (y + 1.0))))
+
+        return func_offset if offset else func
 
 
 @invocation("halftone", title="Halftone", tags=["halftone"], version="1.0.0")
@@ -59,20 +62,30 @@ class HalftoneInvocation(BaseInvocation, HalftoneBase):
     image: ImageField = InputField(description="The image to halftone", default=None)
     spacing: float = InputField(gt=0, le=800, description="Halftone dot spacing", default=8)
     angle: float = InputField(ge=0, lt=360, description="Halftone angle", default=45)
+    oversampling: int = InputField(ge=1, le=4, description="Oversampling factor", default=1)
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
         mode = image.mode
+        width, height = image.size
+
+        alpha_channel = image.getchannel("A") if mode == "RGBA" else None
 
         image = image.convert("L")
-        image = self.array_from_pil(image)
-        halftoned = image > self.evaluate_2d_func(image.shape, self.euclid_dot(self.spacing, self.angle))
-        halftoned = self.pil_from_array(halftoned)
 
-        if mode == "RGBA":
-            image = halftoned.convert("RGBA")
-        else:
-            image = halftoned.convert("RGB")
+        image = image.resize((width * self.oversampling, height * self.oversampling))
+        image = self.array_from_pil(image)
+        image = image >= self.evaluate_2d_func(
+            image.shape, self.euclid_dot(self.spacing * self.oversampling, self.angle, False)
+        )
+        image = self.pil_from_array(image)
+        image = image.resize((width, height))
+
+        image = image.convert("RGB")
+
+        # Make the image RGBA if we had a source alpha channel
+        if alpha_channel is not None:
+            image.putalpha(alpha_channel)
 
         image_dto = context.services.images.create(
             image=image,
@@ -92,7 +105,7 @@ class HalftoneInvocation(BaseInvocation, HalftoneBase):
         )
 
 
-@invocation("cmyk_halftone", title="CMYK Halftone", tags=["halftone"], version="1.0.0")
+@invocation("cmyk_halftone", title="CMYK Halftone", tags=["halftone"], version="1.0.1")
 class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
     """Halftones an image in the style of a CMYK print"""
 
@@ -102,35 +115,61 @@ class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
     m_angle: float = InputField(ge=0, lt=360, description="M halftone angle", default=75)
     y_angle: float = InputField(ge=0, lt=360, description="Y halftone angle", default=90)
     k_angle: float = InputField(ge=0, lt=360, description="K halftone angle", default=45)
+    oversampling: int = InputField(ge=1, le=4, description="Oversampling factor", default=1)
+    offset_c: bool = InputField(default=False, description="Offset Cyan halfway between dots")
+    offset_m: bool = InputField(default=False, description="Offset Magenta halfway between dots")
+    offset_y: bool = InputField(default=False, description="Offset Yellow halfway between dots")
+    offset_k: bool = InputField(default=False, description="Offset K halfway between dots")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
         mode = image.mode
+        width, height = image.size
+
+        alpha_channel = image.getchannel("A") if mode == "RGBA" else None
 
         image = image.convert("CMYK")
+
         c, m, y, k = image.split()
 
+        c = c.resize((width * self.oversampling, height * self.oversampling))
         c = self.array_from_pil(c)
-        c = c > self.evaluate_2d_func(c.shape, self.euclid_dot(self.spacing, self.c_angle))
+        c = c >= self.evaluate_2d_func(
+            c.shape, self.euclid_dot(self.spacing * self.oversampling, self.c_angle, self.offset_c)
+        )
         c = self.pil_from_array(c)
+        c = c.resize((width, height))
 
+        m = m.resize((width * self.oversampling, height * self.oversampling))
         m = self.array_from_pil(m)
-        m = m > self.evaluate_2d_func(m.shape, self.euclid_dot(self.spacing, self.m_angle))
+        m = m >= self.evaluate_2d_func(
+            m.shape, self.euclid_dot(self.spacing * self.oversampling, self.m_angle, self.offset_m)
+        )
         m = self.pil_from_array(m)
+        m = m.resize((width, height))
 
+        y = y.resize((width * self.oversampling, height * self.oversampling))
         y = self.array_from_pil(y)
-        y = y > self.evaluate_2d_func(y.shape, self.euclid_dot(self.spacing, self.y_angle))
+        y = y >= self.evaluate_2d_func(
+            y.shape, self.euclid_dot(self.spacing * self.oversampling, self.y_angle, self.offset_y)
+        )
         y = self.pil_from_array(y)
+        y = y.resize((width, height))
 
+        k = k.resize((width * self.oversampling, height * self.oversampling))
         k = self.array_from_pil(k)
-        k = k > self.evaluate_2d_func(k.shape, self.euclid_dot(self.spacing, self.k_angle))
+        k = k >= self.evaluate_2d_func(
+            k.shape, self.euclid_dot(self.spacing * self.oversampling, self.k_angle, self.offset_k)
+        )
         k = self.pil_from_array(k)
+        k = k.resize((width, height))
 
-        halftoned = Image.merge("CMYK", (c, m, y, k))
-        if mode == "RGBA":
-            image = halftoned.convert("RGBA")
-        else:
-            image = halftoned.convert("RGB")
+        image = Image.merge("CMYK", (c, m, y, k))
+
+        image = image.convert("RGB")
+
+        if alpha_channel is not None:
+            image.putalpha(alpha_channel)
 
         image_dto = context.services.images.create(
             image=image,
