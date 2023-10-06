@@ -105,7 +105,7 @@ class HalftoneInvocation(BaseInvocation, HalftoneBase):
         )
 
 
-@invocation("cmyk_halftone", title="CMYK Halftone", tags=["halftone"], version="1.0.1")
+@invocation("cmyk_halftone", title="CMYK Halftone", tags=["halftone"], version="1.0.2")
 class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
     """Halftones an image in the style of a CMYK print"""
 
@@ -121,6 +121,39 @@ class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
     offset_y: bool = InputField(default=False, description="Offset Yellow halfway between dots")
     offset_k: bool = InputField(default=False, description="Offset K halfway between dots")
 
+    def convert_rgb_to_cmyk(self, image: Image) -> Image:
+        r = self.array_from_pil(image.getchannel("R"))
+        g = self.array_from_pil(image.getchannel("G"))
+        b = self.array_from_pil(image.getchannel("B"))
+
+        k = 1 - np.maximum(np.maximum(r, g), b)
+        c = (1 - r - k) / (1 - k)
+        m = (1 - g - k) / (1 - k)
+        y = (1 - b - k) / (1 - k)
+
+        c = self.pil_from_array(c)
+        m = self.pil_from_array(m)
+        y = self.pil_from_array(y)
+        k = self.pil_from_array(k)
+
+        return Image.merge("CMYK", (c, m, y, k))
+
+    def convert_cmyk_to_rgb(self, image: Image) -> Image:
+        c = self.array_from_pil(image.getchannel("C"))
+        m = self.array_from_pil(image.getchannel("M"))
+        y = self.array_from_pil(image.getchannel("Y"))
+        k = self.array_from_pil(image.getchannel("K"))
+
+        r = (1 - c) * (1 - k)
+        g = (1 - m) * (1 - k)
+        b = (1 - y) * (1 - k)
+
+        r = self.pil_from_array(r)
+        g = self.pil_from_array(g)
+        b = self.pil_from_array(b)
+
+        return Image.merge("RGB", (r, g, b))
+
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.services.images.get_pil_image(self.image.image_name)
         mode = image.mode
@@ -128,7 +161,7 @@ class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
 
         alpha_channel = image.getchannel("A") if mode == "RGBA" else None
 
-        image = image.convert("CMYK")
+        image = self.convert_rgb_to_cmyk(image)
 
         c, m, y, k = image.split()
 
@@ -166,7 +199,7 @@ class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
 
         image = Image.merge("CMYK", (c, m, y, k))
 
-        image = image.convert("RGB")
+        image = self.convert_cmyk_to_rgb(image)
 
         if alpha_channel is not None:
             image.putalpha(alpha_channel)
