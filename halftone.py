@@ -55,7 +55,7 @@ class HalftoneBase:
         return func_offset if offset else func
 
 
-@invocation("halftone", title="Halftone", tags=["halftone"], version="1.0.0")
+@invocation("halftone", title="Halftone", tags=["halftone"], version="1.0.2")
 class HalftoneInvocation(BaseInvocation, HalftoneBase):
     """Halftones an image"""
 
