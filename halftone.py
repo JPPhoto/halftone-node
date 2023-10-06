@@ -72,6 +72,7 @@ class HalftoneInvocation(BaseInvocation, HalftoneBase):
         alpha_channel = image.getchannel("A") if mode == "RGBA" else None
 
         image = image.convert("L")
+
         image = image.resize((width * self.oversampling, height * self.oversampling))
         image = self.array_from_pil(image)
         image = image >= self.evaluate_2d_func(
@@ -127,39 +128,43 @@ class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
 
         alpha_channel = image.getchannel("A") if mode == "RGBA" else None
 
-        image = image.resize((width * self.oversampling, height * self.oversampling))
-
         image = image.convert("CMYK")
 
         c, m, y, k = image.split()
 
+        c = c.resize((width * self.oversampling, height * self.oversampling))
         c = self.array_from_pil(c)
         c = c >= self.evaluate_2d_func(
             c.shape, self.euclid_dot(self.spacing * self.oversampling, self.c_angle, self.offset_c)
         )
         c = self.pil_from_array(c)
+        c = c.resize((width, height))
 
+        m = m.resize((width * self.oversampling, height * self.oversampling))
         m = self.array_from_pil(m)
         m = m >= self.evaluate_2d_func(
             m.shape, self.euclid_dot(self.spacing * self.oversampling, self.m_angle, self.offset_m)
         )
         m = self.pil_from_array(m)
+        m = m.resize((width, height))
 
+        y = y.resize((width * self.oversampling, height * self.oversampling))
         y = self.array_from_pil(y)
         y = y >= self.evaluate_2d_func(
             y.shape, self.euclid_dot(self.spacing * self.oversampling, self.y_angle, self.offset_y)
         )
         y = self.pil_from_array(y)
+        y = y.resize((width, height))
 
+        k = k.resize((width * self.oversampling, height * self.oversampling))
         k = self.array_from_pil(k)
         k = k >= self.evaluate_2d_func(
             k.shape, self.euclid_dot(self.spacing * self.oversampling, self.k_angle, self.offset_k)
         )
         k = self.pil_from_array(k)
+        k = k.resize((width, height))
 
         image = Image.merge("CMYK", (c, m, y, k))
-
-        image = image.resize((width, height))
 
         image = image.convert("RGB")
 
