@@ -13,13 +13,15 @@ from invokeai.app.invocations.baseinvocation import (
     InputField,
     InvocationContext,
     OutputField,
+    WithMetadata,
+    WithWorkflow,
     invocation,
 )
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
-from invokeai.app.models.image import ImageCategory, ResourceOrigin
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 
 
-class HalftoneBase:
+class HalftoneBase(WithMetadata, WithWorkflow):
     def pil_from_array(self, arr):
         return Image.fromarray((arr * 255).astype("uint8"))
 
@@ -55,11 +57,11 @@ class HalftoneBase:
         return func_offset if offset else func
 
 
-@invocation("halftone", title="Halftone", tags=["halftone"], version="1.0.2")
+@invocation("halftone", title="Halftone", tags=["halftone"], version="1.0.3")
 class HalftoneInvocation(BaseInvocation, HalftoneBase):
     """Halftones an image"""
 
-    image: ImageField = InputField(description="The image to halftone", default=None)
+    image: ImageField = InputField(description="The image to halftone")
     spacing: float = InputField(gt=0, le=800, description="Halftone dot spacing", default=8)
     angle: float = InputField(ge=0, lt=360, description="Halftone angle", default=45)
     oversampling: int = InputField(ge=1, le=4, description="Oversampling factor", default=1)
@@ -94,7 +96,7 @@ class HalftoneInvocation(BaseInvocation, HalftoneBase):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            metadata=None,
+            metadata=self.metadata,
             workflow=self.workflow,
         )
 
@@ -105,11 +107,11 @@ class HalftoneInvocation(BaseInvocation, HalftoneBase):
         )
 
 
-@invocation("cmyk_halftone", title="CMYK Halftone", tags=["halftone"], version="1.0.2")
+@invocation("cmyk_halftone", title="CMYK Halftone", tags=["halftone"], version="1.0.3")
 class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
     """Halftones an image in the style of a CMYK print"""
 
-    image: ImageField = InputField(description="The image to halftone", default=None)
+    image: ImageField = InputField(description="The image to halftone")
     spacing: float = InputField(gt=0, le=800, description="Halftone dot spacing", default=8)
     c_angle: float = InputField(ge=0, lt=360, description="C halftone angle", default=15)
     m_angle: float = InputField(ge=0, lt=360, description="M halftone angle", default=75)
@@ -211,7 +213,7 @@ class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
             node_id=self.id,
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
-            metadata=None,
+            metadata=self.metadata,
             workflow=self.workflow,
         )
 
