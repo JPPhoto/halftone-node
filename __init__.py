@@ -1,1 +1,1 @@
-from .halftone import HalftoneInvocation, CMYKHalftoneInvocation
+from .halftone import CMYKHalftoneInvocation, HalftoneInvocation
