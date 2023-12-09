@@ -1,27 +1,22 @@
 # Copyright (c) 2023 Jonathan S. Pollack (https://github.com/JPPhoto)
 # Halftoning implementation via Bohumir Zamecnik (https://github.com/bzamecnik/halftone/)
 
-from typing import Callable, Optional, Tuple
+from typing import Callable, Tuple
 
 import numpy as np
-from PIL import Image
-from pydantic import BaseModel
-
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
-    BaseInvocationOutput,
     InputField,
     InvocationContext,
-    OutputField,
     WithMetadata,
-    WithWorkflow,
     invocation,
 )
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from PIL import Image
 
 
-class HalftoneBase(WithMetadata, WithWorkflow):
+class HalftoneBase(WithMetadata):
     def pil_from_array(self, arr):
         return Image.fromarray((arr * 255).astype("uint8"))
 
@@ -97,7 +92,7 @@ class HalftoneInvocation(BaseInvocation, HalftoneBase):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         return ImageOutput(
@@ -214,7 +209,7 @@ class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
             session_id=context.graph_execution_state_id,
             is_intermediate=self.is_intermediate,
             metadata=self.metadata,
-            workflow=self.workflow,
+            workflow=context.workflow,
         )
 
         return ImageOutput(
