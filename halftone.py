@@ -4,16 +4,15 @@
 from typing import Callable, Tuple
 
 import numpy as np
+from PIL import Image
+
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
-    InputField,
     InvocationContext,
-    WithMetadata,
     invocation,
 )
+from invokeai.app.invocations.fields import InputField, WithBoard, WithMetadata
 from invokeai.app.invocations.primitives import ImageField, ImageOutput
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from PIL import Image
 
 
 class HalftoneBase(WithMetadata):
@@ -52,8 +51,8 @@ class HalftoneBase(WithMetadata):
         return func_offset if offset else func
 
 
-@invocation("halftone", title="Halftone", tags=["halftone"], version="1.0.3")
-class HalftoneInvocation(BaseInvocation, HalftoneBase):
+@invocation("halftone", title="Halftone", tags=["halftone"], version="1.1.0")
+class HalftoneInvocation(BaseInvocation, HalftoneBase, WithBoard):
     """Halftones an image"""
 
     image: ImageField = InputField(description="The image to halftone")
@@ -62,7 +61,7 @@ class HalftoneInvocation(BaseInvocation, HalftoneBase):
     oversampling: int = InputField(ge=1, le=4, description="Oversampling factor", default=1)
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
+        image = context.images.get_pil(self.image.image_name)
         mode = image.mode
         width, height = image.size
 
@@ -84,26 +83,13 @@ class HalftoneInvocation(BaseInvocation, HalftoneBase):
         if alpha_channel is not None:
             image.putalpha(alpha_channel)
 
-        image_dto = context.services.images.create(
-            image=image,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata,
-            workflow=context.workflow,
-        )
+        image_dto = context.images.save(image=image)
 
-        return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image.width,
-            height=image.height,
-        )
+        return ImageOutput.build(image_dto)
 
 
-@invocation("cmyk_halftone", title="CMYK Halftone", tags=["halftone"], version="1.0.3")
-class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
+@invocation("cmyk_halftone", title="CMYK Halftone", tags=["halftone"], version="1.1.0")
+class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase, WithBoard):
     """Halftones an image in the style of a CMYK print"""
 
     image: ImageField = InputField(description="The image to halftone")
@@ -152,7 +138,7 @@ class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
         return Image.merge("RGB", (r, g, b))
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.services.images.get_pil_image(self.image.image_name)
+        image = context.images.get_pil(self.image.image_name)
         mode = image.mode
         width, height = image.size
 
@@ -201,19 +187,6 @@ class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase):
         if alpha_channel is not None:
             image.putalpha(alpha_channel)
 
-        image_dto = context.services.images.create(
-            image=image,
-            image_origin=ResourceOrigin.INTERNAL,
-            image_category=ImageCategory.GENERAL,
-            node_id=self.id,
-            session_id=context.graph_execution_state_id,
-            is_intermediate=self.is_intermediate,
-            metadata=self.metadata,
-            workflow=context.workflow,
-        )
+        image_dto = context.images.save(image=image)
 
-        return ImageOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            width=image.width,
-            height=image.height,
-        )
+        return ImageOutput.build(image_dto)
