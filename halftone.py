@@ -6,13 +6,13 @@ from typing import Callable, Tuple
 import numpy as np
 from PIL import Image
 
-from invokeai.app.invocations.fields import WithBoard
 from invokeai.invocation_api import (
     BaseInvocation,
     ImageField,
     ImageOutput,
     InputField,
     InvocationContext,
+    WithBoard,
     WithMetadata,
     invocation,
 )
@@ -54,7 +54,7 @@ class HalftoneBase(WithMetadata):
         return func_offset if offset else func
 
 
-@invocation("halftone", title="Halftone", tags=["halftone"], version="1.1.1")
+@invocation("halftone", title="Halftone", tags=["halftone"], version="1.1.2")
 class HalftoneInvocation(BaseInvocation, HalftoneBase, WithBoard):
     """Halftones an image"""
 
@@ -91,7 +91,7 @@ class HalftoneInvocation(BaseInvocation, HalftoneBase, WithBoard):
         return ImageOutput.build(image_dto)
 
 
-@invocation("cmyk_halftone", title="CMYK Halftone", tags=["halftone"], version="1.1.1")
+@invocation("cmyk_halftone", title="CMYK Halftone", tags=["halftone"], version="1.1.2")
 class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase, WithBoard):
     """Halftones an image in the style of a CMYK print"""
 
