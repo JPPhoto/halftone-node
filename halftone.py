@@ -20,7 +20,8 @@ from invokeai.invocation_api import (
 
 class HalftoneBase(WithMetadata):
     def pil_from_array(self, arr):
-        return Image.fromarray((arr * 255).astype("uint8"))
+        sanitized = np.nan_to_num(arr * 255.0, nan=0.0, posinf=255.0, neginf=0.0)
+        return Image.fromarray(np.clip(sanitized, 0, 255).astype("uint8"))
 
     def array_from_pil(self, img):
         return np.array(img) / 255
@@ -54,14 +55,14 @@ class HalftoneBase(WithMetadata):
         return func_offset if offset else func
 
 
-@invocation("halftone", title="Halftone", tags=["halftone"], version="1.1.2")
+@invocation("halftone", title="Halftone", tags=["halftone"], version="1.1.3")
 class HalftoneInvocation(BaseInvocation, HalftoneBase, WithBoard):
     """Halftones an image"""
 
     image: ImageField = InputField(description="The image to halftone")
     spacing: float = InputField(gt=0, le=800, description="Halftone dot spacing", default=8)
     angle: float = InputField(ge=0, lt=360, description="Halftone angle", default=45)
-    oversampling: int = InputField(ge=1, le=4, description="Oversampling factor", default=1)
+    oversampling: int = InputField(ge=1, le=8, description="Oversampling factor", default=1)
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
@@ -91,7 +92,7 @@ class HalftoneInvocation(BaseInvocation, HalftoneBase, WithBoard):
         return ImageOutput.build(image_dto)
 
 
-@invocation("cmyk_halftone", title="CMYK Halftone", tags=["halftone"], version="1.1.2")
+@invocation("cmyk_halftone", title="CMYK Halftone", tags=["halftone"], version="1.1.3")
 class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase, WithBoard):
     """Halftones an image in the style of a CMYK print"""
 
@@ -101,7 +102,7 @@ class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase, WithBoard):
     m_angle: float = InputField(ge=0, lt=360, description="M halftone angle", default=75)
     y_angle: float = InputField(ge=0, lt=360, description="Y halftone angle", default=90)
     k_angle: float = InputField(ge=0, lt=360, description="K halftone angle", default=45)
-    oversampling: int = InputField(ge=1, le=4, description="Oversampling factor", default=1)
+    oversampling: int = InputField(ge=1, le=8, description="Oversampling factor", default=1)
     offset_c: bool = InputField(default=False, description="Offset Cyan halfway between dots")
     offset_m: bool = InputField(default=False, description="Offset Magenta halfway between dots")
     offset_y: bool = InputField(default=False, description="Offset Yellow halfway between dots")
@@ -113,9 +114,17 @@ class CMYKHalftoneInvocation(BaseInvocation, HalftoneBase, WithBoard):
         b = self.array_from_pil(image.getchannel("B"))
 
         k = 1 - np.maximum(np.maximum(r, g), b)
-        c = (1 - r - k) / (1 - k)
-        m = (1 - g - k) / (1 - k)
-        y = (1 - b - k) / (1 - k)
+
+        c = np.zeros_like(r)
+        m = np.zeros_like(g)
+        y = np.zeros_like(b)
+
+        mask = (1 - k) != 0
+        denom = 1 - k
+
+        c[mask] = (1 - r[mask] - k[mask]) / denom[mask]
+        m[mask] = (1 - g[mask] - k[mask]) / denom[mask]
+        y[mask] = (1 - b[mask] - k[mask]) / denom[mask]
 
         c = self.pil_from_array(c)
         m = self.pil_from_array(m)
