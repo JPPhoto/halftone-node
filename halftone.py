@@ -4,8 +4,6 @@
 from typing import Callable, Tuple
 
 import numpy as np
-from PIL import Image
-
 from invokeai.invocation_api import (
     BaseInvocation,
     ImageField,
@@ -16,6 +14,7 @@ from invokeai.invocation_api import (
     WithMetadata,
     invocation,
 )
+from PIL import Image
 
 
 class HalftoneBase(WithMetadata):
